@@ -54,6 +54,17 @@ public class FileService {
         }
     }
 
+    public boolean deleteFolder(File folder) {
+        for (File child : folder.listFiles()) {
+            if (child.isDirectory()) {
+                deleteFolder(child);
+            } else if (!child.delete()) {
+                return false;
+            }
+        }
+        return folder.delete();
+    }
+
     private File initFile(String name) {
         File file = new File(name);
         file.mkdirs();
@@ -175,6 +186,24 @@ public class FileService {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    public void copy(File source, File fileCopy) throws IOException {
+        if (source == null || !source.exists()) {
+            throw new NullPointerException("File source is null or not exists!");
+        }
+        if (fileCopy == null) {
+            throw new NullPointerException("File copy is null!");
+        }
+        fileCopy.getParentFile().mkdirs();
+        if (fileCopy.exists() && !fileCopy.delete()) {
+            throw new IOException("File copy can not override!");
+        }
+        try ( FileInputStream inputStream = new FileInputStream(source)) {
+            try ( FileOutputStream outputStream = new FileOutputStream(fileCopy)) {
+                transferFile(inputStream, outputStream);
+            }
         }
     }
 }
