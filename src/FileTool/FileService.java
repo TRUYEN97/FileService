@@ -24,12 +24,12 @@ import java.util.zip.ZipOutputStream;
  */
 public class FileService {
 
-    public boolean saveFile(String name, String data) {
+    public boolean writeFile(String name, String data, boolean appand) {
         if (name == null || data == null || data.isEmpty()) {
             return false;
         }
-        File file = initFile(name);
-        try ( FileWriter writer = new FileWriter(file)) {
+        File file = new File(name);
+        try ( FileWriter writer = new FileWriter(file, appand)){
             writer.write(data);
             writer.flush();
             return true;
@@ -37,6 +37,10 @@ public class FileService {
             ex.printStackTrace();
             return false;
         }
+    }
+
+    public boolean saveFile(String name, String data) {
+        return writeFile(name, data, false);
     }
 
     public boolean saveFile(String path, byte[] data) {
