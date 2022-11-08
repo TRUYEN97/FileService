@@ -17,6 +17,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -61,6 +64,36 @@ public class FileService {
         }
     }
 
+    public String MD5(File file) throws IOException, NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        return MD5(file, md);
+    }
+
+    public String MD5(File file, MessageDigest md) throws IOException {
+
+        StringBuilder MD5 = new StringBuilder();
+        if (file.isDirectory()) {
+            for (File listFile : file.listFiles()) {
+                MD5.append(MD5(listFile, md));
+            }
+        } else {
+            try ( InputStream is = Files.newInputStream(file.toPath());  DigestInputStream dis = new DigestInputStream(is, md)) {
+                byte[] byteArray = new byte[1024];
+                int bytesCount;
+                while ((bytesCount = dis.read(byteArray)) != -1) {
+                    md.update(byteArray, 0, bytesCount);
+                }
+                byte[] bytes = md.digest();
+                for (int i = 0; i < bytes.length; i++) {
+                    MD5.append(Integer
+                            .toString((bytes[i] & 0xff) + 0x100, 16)
+                            .substring(1));
+                }
+            }
+        }
+        return MD5.toString();
+    }
+
     public boolean deleteFolder(File folder) {
         for (File child : folder.listFiles()) {
             if (child.isDirectory()) {
@@ -70,6 +103,10 @@ public class FileService {
             }
         }
         return folder.delete();
+    }
+
+    public void deleteFolder(String newFolder) {
+        deleteFolder(new File(newFolder));
     }
 
     private File initFile(String name) {
@@ -232,4 +269,5 @@ public class FileService {
             }
         }
     }
+
 }
