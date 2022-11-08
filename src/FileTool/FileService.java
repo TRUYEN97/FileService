@@ -14,6 +14,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -29,7 +32,7 @@ public class FileService {
             return false;
         }
         File file = new File(name);
-        try ( FileWriter writer = new FileWriter(file, appand)){
+        try ( FileWriter writer = new FileWriter(file, appand)) {
             writer.write(data);
             writer.flush();
             return true;
@@ -115,6 +118,25 @@ public class FileService {
 
     public boolean zipFile(String zipPath, File file) {
         return zipFile(zipPath, new File[]{file});
+    }
+
+    public void zipFolder(String sourceDirPath, String zipFilePath) throws IOException {
+        Path p = Files.createFile(Paths.get(zipFilePath));
+        try ( ZipOutputStream zs = new ZipOutputStream(Files.newOutputStream(p))) {
+            Path pp = Paths.get(sourceDirPath);
+            Files.walk(pp)
+                    .filter(path -> !Files.isDirectory(path))
+                    .forEach(path -> {
+                        ZipEntry zipEntry = new ZipEntry(pp.relativize(path).toString());
+                        try {
+                            zs.putNextEntry(zipEntry);
+                            Files.copy(path, zs);
+                            zs.closeEntry();
+                        } catch (IOException e) {
+                            System.err.println(e);
+                        }
+                    });
+        }
     }
 
     public boolean zipFile(String zipPath, File[] files) {
