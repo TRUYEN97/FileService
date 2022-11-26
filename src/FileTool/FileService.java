@@ -4,7 +4,6 @@
  */
 package FileTool;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -14,15 +13,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  *
@@ -45,6 +38,15 @@ public class FileService {
         }
     }
 
+    public void moveFolder(String sourceFile, String destFile) throws IOException {
+        moveFolder(new File(sourceFile), new File(destFile));
+    }
+
+    public void moveFolder(File sourceFile, File destFile) throws IOException {
+        copyFilesInDirectory(sourceFile, destFile);
+        deleteFolder(sourceFile);
+    }
+
     public boolean saveFile(String name, String data) {
         return writeFile(name, data, false);
     }
@@ -64,37 +66,13 @@ public class FileService {
         }
     }
 
-    public String MD5(File file) throws IOException, NoSuchAlgorithmException {
-        MessageDigest md = MessageDigest.getInstance("MD5");
-        return MD5(file, md);
-    }
-
-    public String MD5(File file, MessageDigest md) throws IOException {
-
-        StringBuilder MD5 = new StringBuilder();
-        if (file.isDirectory()) {
-            for (File listFile : file.listFiles()) {
-                MD5.append(MD5(listFile, md));
-            }
-        } else {
-            try ( InputStream is = Files.newInputStream(file.toPath());  DigestInputStream dis = new DigestInputStream(is, md)) {
-                byte[] byteArray = new byte[1024];
-                int bytesCount;
-                while ((bytesCount = dis.read(byteArray)) != -1) {
-                    md.update(byteArray, 0, bytesCount);
-                }
-                byte[] bytes = md.digest();
-                for (int i = 0; i < bytes.length; i++) {
-                    MD5.append(Integer
-                            .toString((bytes[i] & 0xff) + 0x100, 16)
-                            .substring(1));
-                }
-            }
-        }
-        return MD5.toString();
-    }
-
     public boolean deleteFolder(File folder) {
+        if (!folder.exists()) {
+            return true;
+        }
+        if (folder.isFile()) {
+            return folder.delete();
+        }
         for (File child : folder.listFiles()) {
             if (child.isDirectory()) {
                 deleteFolder(child);
@@ -134,99 +112,6 @@ public class FileService {
         return str.toString();
     }
 
-    public boolean zipFile(String fileNameInZip, String zipPath, String detail) {
-        File zipFile = new File(zipPath);
-        if (zipFile.exists() && !zipFile.delete()) {
-            return false;
-        }
-        try ( ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipPath))) {
-            try ( BufferedOutputStream bos = new BufferedOutputStream(out)) {
-                out.putNextEntry(new ZipEntry(fileNameInZip));
-                byte[] buf = detail.getBytes();
-                bos.write(buf);
-                bos.flush();
-            }
-            return true;
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            return false;
-        }
-    }
-
-    public boolean zipFile(String zipPath, File file) {
-        return zipFile(zipPath, new File[]{file});
-    }
-
-    public void zipFolder(String sourceDirPath, String zipFilePath) throws IOException {
-        Path p = Files.createFile(Paths.get(zipFilePath));
-        try ( ZipOutputStream zs = new ZipOutputStream(Files.newOutputStream(p))) {
-            Path pp = Paths.get(sourceDirPath);
-            Files.walk(pp)
-                    .filter(path -> !Files.isDirectory(path))
-                    .forEach(path -> {
-                        ZipEntry zipEntry = new ZipEntry(pp.relativize(path).toString());
-                        try {
-                            zs.putNextEntry(zipEntry);
-                            Files.copy(path, zs);
-                            zs.closeEntry();
-                        } catch (IOException e) {
-                            System.err.println(e);
-                        }
-                    });
-        }
-    }
-
-    public boolean zipFile(String zipPath, File[] files) {
-        File zipFile = new File(zipPath);
-        if (zipFile.exists() && !zipFile.delete()) {
-            return false;
-        }
-        try ( ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipPath))) {
-            try ( BufferedOutputStream bos = new BufferedOutputStream(out)) {
-                for (File file : files) {
-                    if (!file.exists()) {
-                        return false;
-                    }
-                    out.putNextEntry(new ZipEntry(file.getName()));
-                    try ( FileInputStream reader = new FileInputStream(file)) {
-                        transferFile(reader, bos);
-                    }
-                    out.closeEntry();
-                }
-            }
-            return true;
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            return false;
-        }
-    }
-
-    public boolean unzip(String zipFilePath, String destDirectory) {
-        File destDir = new File(destDirectory);
-        if (!destDir.exists()) {
-            destDir.mkdir();
-        }
-        try ( ZipInputStream zipIn = new ZipInputStream(new FileInputStream(zipFilePath))) {
-            ZipEntry entry;
-            while ((entry = zipIn.getNextEntry()) != null) {
-                String filePath = destDirectory + File.separator + entry.getName();
-                if (!entry.isDirectory()) {
-                    try ( BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(new File(filePath)))) {
-                        transferFile(zipIn, output);
-                    }
-                } else {
-                    File dir = new File(filePath);
-                    dir.mkdirs();
-                }
-                zipIn.closeEntry();
-            }
-            return true;
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            return false;
-        }
-    }
-
     /**
      *
      *
@@ -252,21 +137,90 @@ public class FileService {
         }
     }
 
-    public void copy(File source, File fileCopy) throws IOException {
+    public void copyFilesInDirectory(File sourceFile, File targetFolder) throws IOException {
+        try {
+            copy(sourceFile, targetFolder, sourceFile);
+        } catch (IOException e) {
+            deleteFolder(targetFolder);
+            throw e;
+        }
+    }
+
+    public void copyFilesInDirectory(File sourceFolder, List<File> files, File targetFolder) throws IOException, Exception {
+        try {
+            if (targetFolder.isFile()) {
+                throw new Exception("sourceFolder and targetFolder need to be the directory");
+            }
+            for (File file : files) {
+                String filePath = file.getPath();
+                File targat;
+                if (sourceFolder != null && !sourceFolder.isFile()) {
+                    targat = new File(filePath.replaceFirst(sourceFolder.getPath().replaceAll("\\\\", "\\\\\\\\"),
+                            targetFolder.getPath().replaceAll("\\\\", "\\\\\\\\")));
+                } else {
+                    targat = new File(String.format("%s%s%s", targetFolder, File.separator, file.getName()));
+                }
+                copy(file, targat);
+            }
+        } catch (IOException e) {
+            this.deleteFolder(targetFolder);
+            throw e;
+        }
+    }
+
+    public void copy(File source, File targetFile) throws IOException {
         if (source == null || !source.exists()) {
             throw new NullPointerException("File source is null or not exists!");
         }
-        if (fileCopy == null) {
+        if (targetFile == null) {
             throw new NullPointerException("File copy is null!");
         }
-        fileCopy.getParentFile().mkdirs();
-        if (fileCopy.exists() && !fileCopy.delete()) {
-            throw new IOException("File copy can not override!");
+        targetFile.getParentFile().mkdirs();
+        if (targetFile.exists() && !targetFile.delete()) {
+            throw new IOException(String.format("File copy can not override!\r\n%s", targetFile.getName()));
         }
         try ( FileInputStream inputStream = new FileInputStream(source)) {
-            try ( FileOutputStream outputStream = new FileOutputStream(fileCopy)) {
+            try ( FileOutputStream outputStream = new FileOutputStream(targetFile)) {
                 transferFile(inputStream, outputStream);
             }
+        }
+    }
+
+    private void copy(File sourceFile, File destFile, File parent) throws IOException {
+        if (sourceFile.isDirectory()) {
+            for (File file : sourceFile.listFiles()) {
+                copy(file, destFile, parent);
+            }
+        } else if (destFile.isFile()) {
+            copy(sourceFile, destFile);
+        } else {
+            File target;
+            if (parent != null && !sourceFile.getPath().equals(parent.getPath())) {
+                target = new File(sourceFile.getPath().replaceFirst(parent.getPath().replaceAll("\\\\", "\\\\\\\\"),
+                        destFile.getPath().replaceAll("\\\\", "\\\\\\\\")));
+            }else{
+                 target = new File(String.format("%s/%s", destFile,sourceFile.getName()));
+            }
+            copy(sourceFile, target);
+        }
+    }
+
+    public List<File> getAllFile(File folder) {
+        List<File> files = new ArrayList<>();
+        getAllFile(folder, files);
+        return files;
+    }
+    
+    private void getAllFile(File folder, List<File> files){
+        if (folder == null) {
+            return;
+        }
+        if (folder.isFile()) {
+            files.add(folder);
+            return;
+        }
+        for (File file : folder.listFiles()) {
+           getAllFile(file, files);
         }
     }
 
