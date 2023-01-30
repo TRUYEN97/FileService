@@ -27,7 +27,7 @@ public class FileService {
         if (name == null || data == null || data.isEmpty()) {
             return false;
         }
-        File file = new File(name);
+        File file = initFile(name);
         try ( FileWriter writer = new FileWriter(file, appand)) {
             writer.write(data);
             writer.flush();
