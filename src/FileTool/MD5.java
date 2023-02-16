@@ -5,10 +5,9 @@
 package FileTool;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.security.DigestInputStream;
+import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -28,7 +27,7 @@ public class MD5 {
         this.fileService = new FileService();
     }
 
-    public String MD5(File file) throws IOException, NoSuchAlgorithmException {
+    public String getMD5(File file) throws IOException, NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
         if (file.isDirectory()) {
             return getOnlyFilesMD5(this.fileService.getAllFile(file), md);
@@ -36,11 +35,11 @@ public class MD5 {
         return getFileMD5(file, md);
     }
 
-    public String MD5(File[] files) throws IOException, NoSuchAlgorithmException {
-        return MD5(Arrays.asList(files));
+    public String getMD5(File[] files) throws IOException, NoSuchAlgorithmException {
+        return getMD5(Arrays.asList(files));
     }
 
-    public String MD5(Collection<File> files) throws IOException, NoSuchAlgorithmException {
+    public String getMD5(Collection<File> files) throws IOException, NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("MD5");
         List<File> allFiles = new ArrayList<>();
         for (File file : allFiles) {
@@ -69,10 +68,10 @@ public class MD5 {
         if (!file.exists()) {
             return null;
         }
-        try ( InputStream is = Files.newInputStream(file.toPath());  DigestInputStream dis = new DigestInputStream(is, md)) {
-            byte[] byteArray = new byte[4096];
+        try ( FileInputStream is = new FileInputStream(file)) {
+            byte[] byteArray = new byte[8192];
             int bytesCount;
-            while ((bytesCount = dis.read(byteArray)) != -1) {
+            while ((bytesCount = is.read(byteArray)) != -1) {
                 md.update(byteArray, 0, bytesCount);
             }
             return convertToHex(md.digest());
@@ -84,7 +83,7 @@ public class MD5 {
             return false;
         }
         try {
-            String ftpMD5 = MD5(file);
+            String ftpMD5 = MD5.this.getMD5(file);
             return ftpMD5.equals(MD5);
         } catch (IOException | NoSuchAlgorithmException ex) {
             return false;
@@ -100,7 +99,7 @@ public class MD5 {
             return false;
         }
         try {
-            String ftpMD5 = MD5(file);
+            String ftpMD5 = getMD5(file);
             return ftpMD5.equals(MD5);
         } catch (IOException | NoSuchAlgorithmException ex) {
             return false;
@@ -108,12 +107,11 @@ public class MD5 {
     }
 
     private String convertToHex(byte[] bytes) {
-        StringBuilder MD5 = new StringBuilder();
-        for (int i = 0; i < bytes.length; i++) {
-            MD5.append(Integer
-                    .toString((bytes[i] & 0xff) + 0x100, 16)
-                    .substring(1));
+        BigInteger bi = new BigInteger(1, bytes);
+        String md5 = bi.toString(16);
+        if (md5.length() != 32) {
+            return 0 + md5;
         }
-        return MD5.toString();
+        return md5;
     }
 }
