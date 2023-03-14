@@ -26,7 +26,7 @@ public class FileService {
         if (name == null || data == null || data.isEmpty()) {
             return false;
         }
-        File file = initFile(name);
+        File file = initFile(name, true);
         try ( FileWriter writer = new FileWriter(file, appand)) {
             writer.write(data);
             writer.flush();
@@ -54,7 +54,7 @@ public class FileService {
         if (path == null || data == null) {
             return false;
         }
-        File file = initFile(path);
+        File file = initFile(path, false);
         try ( FileOutputStream writer = new FileOutputStream(file)) {
             writer.write(data);
             writer.flush();
@@ -86,10 +86,10 @@ public class FileService {
         deleteFolder(new File(newFolder));
     }
 
-    private File initFile(String name) {
+    private File initFile(String name, boolean appand) {
         File file = new File(name);
-        file.mkdirs();
-        if (file.exists()) {
+        file.getParentFile().mkdirs();
+        if (!appand && file.exists()) {
             file.delete();
         }
         return file;
